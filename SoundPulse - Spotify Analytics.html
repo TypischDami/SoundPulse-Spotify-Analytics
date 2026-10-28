@@ -1,0 +1,1522 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoundPulse — Spotify Listening History Dashboard</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Font Inter & Space Grotesk -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@500;700;900&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        spotify: '#1DB954',
+                        'spotify-dark': '#121212',
+                        'spotify-card': '#181818',
+                        'spotify-hover': '#282828',
+                        'neon-purple': '#a855f7',
+                        'neon-cyan': '#06b6d4',
+                        'neon-pink': '#ec4899',
+                        'dark-bg': '#08090d',
+                        'dark-card': 'rgba(23, 25, 35, 0.65)',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Space Grotesk', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'glow': 'glow 2s ease-in-out infinite alternate',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        glow: {
+                            '0%': { opacity: '0.4', filter: 'blur(20px)' },
+                            '100%': { opacity: '0.8', filter: 'blur(30px)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #08090d;
+            color: #f3f4f6;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* Glassmorphism Effect */
+        .glass-card {
+            background: rgba(18, 20, 29, 0.55);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .glass-card-interactive {
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        .glass-card-interactive:hover {
+            transform: translateY(-4px);
+            border-color: rgba(29, 185, 84, 0.4);
+            box-shadow: 0 12px 30px rgba(29, 185, 84, 0.15);
+        }
+
+        /* Intro Overlay Animation Styles */
+        #intro-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            background: rgba(4, 5, 8, 0.96);
+            backdrop-filter: blur(30px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            transition: all 1.1s cubic-bezier(0.77, 0, 0.175, 1);
+            overflow: hidden;
+        }
+
+        #intro-overlay.dismissing {
+            opacity: 0;
+            transform: translateY(-100%) scale(0.96);
+            filter: blur(16px);
+            pointer-events: none;
+        }
+
+        .intro-subtext {
+            opacity: 0;
+            transform: translateY(15px);
+            animation: fadeInSub 0.8s ease forwards 0.3s;
+        }
+
+        .intro-title {
+            opacity: 0;
+            transform: scale(0.92) translateY(20px);
+            animation: fadeInTitle 1s cubic-bezier(0.16, 1, 0.3, 1) forwards 0.5s;
+        }
+
+        /* Pulsing Glow Rings in Intro */
+        .intro-glow-ring {
+            position: absolute;
+            width: 320px;
+            height: 320px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(29, 185, 84, 0.25) 0%, rgba(168, 85, 247, 0.15) 50%, rgba(0,0,0,0) 70%);
+            animation: pulseGlow 4s ease-in-out infinite alternate;
+            pointer-events: none;
+        }
+
+        @keyframes pulseGlow {
+            0% { transform: scale(0.85); opacity: 0.4; filter: blur(30px); }
+            100% { transform: scale(1.25); opacity: 0.8; filter: blur(45px); }
+        }
+
+        @keyframes fadeInSub {
+            to { opacity: 0.85; transform: translateY(0); }
+        }
+
+        @keyframes fadeInTitle {
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0d0e12;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #222634;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #1DB954;
+        }
+
+        /* Animated Gradient Background Glows */
+        .bg-glow-1 { background: radial-gradient(circle, rgba(29,185,84,0.18) 0%, rgba(0,0,0,0) 70%); }
+        .bg-glow-2 { background: radial-gradient(circle, rgba(168,85,247,0.15) 0%, rgba(0,0,0,0) 70%); }
+        .bg-glow-3 { background: radial-gradient(circle, rgba(6,182,212,0.15) 0%, rgba(0,0,0,0) 70%); }
+
+        /* Smooth View Animations */
+        .slide-enter {
+            animation: slideIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .stagger-item {
+            opacity: 0;
+            animation: staggerFade 0.5s ease forwards;
+        }
+
+        @keyframes staggerFade {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Dynamic Rank Badge Gradients */
+        .rank-1 { background: linear-gradient(135deg, #FFE000 0%, #799F0C 100%); color: #000; }
+        .rank-2 { background: linear-gradient(135deg, #E0E0E0 0%, #8A8A8A 100%); color: #000; }
+        .rank-3 { background: linear-gradient(135deg, #F39C12 0%, #D35400 100%); color: #fff; }
+        .rank-default { background: rgba(255, 255, 255, 0.1); color: #fff; }
+
+        /* Secret Twizzy Mode / Tonka Visual Effects */
+        body.rage-mode {
+            background-color: #040e07 !important;
+            animation: pulse-twizzy 1.8s infinite alternate;
+        }
+
+        body.rage-mode .glass-card {
+            border-color: rgba(29, 185, 84, 0.35);
+            box-shadow: 0 0 25px rgba(29, 185, 84, 0.2);
+        }
+
+        @keyframes pulse-twizzy {
+            0% { box-shadow: inset 0 0 60px rgba(29, 185, 84, 0.25); }
+            100% { box-shadow: inset 0 0 120px rgba(16, 185, 129, 0.5); }
+        }
+
+        /* Sleek Modern Vehicle Animation */
+        .tonka-truck-anim {
+            position: fixed;
+            bottom: 10%;
+            left: -400px;
+            z-index: 999;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            animation: driveTonka 2.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+
+        @keyframes driveTonka {
+            0% { left: -400px; transform: scale(0.85); }
+            60% { transform: scale(1.02); }
+            100% { left: 115vw; transform: scale(0.95); }
+        }
+
+        /* Toast Popup Banner */
+        #twizzy-toast {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 200;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform: translateX(150%);
+        }
+
+        #twizzy-toast.show {
+            transform: translateX(0);
+        }
+    </style>
+</head>
+<body class="min-h-screen relative flex flex-col justify-between selection:bg-spotify selection:text-black transition-colors duration-500">
+
+    <!-- CINEMATIC ULTRA-AESTHETIC GLASSY INTRO OVERLAY -->
+    <div id="intro-overlay">
+        <!-- Floating Ambient Aurora Orbs -->
+        <div class="intro-glow-ring"></div>
+        <div class="absolute w-[500px] h-[500px] bg-gradient-to-tr from-spotify/15 via-neon-purple/15 to-transparent rounded-full blur-3xl animate-pulse-slow"></div>
+
+        <div class="glass-card rounded-3xl p-10 sm:p-14 text-center border border-spotify/30 shadow-[0_0_80px_rgba(29,185,84,0.15)] max-w-lg mx-4 relative overflow-hidden backdrop-blur-2xl">
+            <!-- Subtle Top Light Accent Bar -->
+            <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-spotify to-transparent"></div>
+
+            <div class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-spotify to-emerald-400 flex items-center justify-center text-black text-3xl font-black shadow-2xl shadow-spotify/40 intro-title">
+                <i class="fa-brands fa-spotify"></i>
+            </div>
+
+            <h1 class="text-4xl sm:text-5xl font-black text-white tracking-tight mb-2 font-display intro-title">
+                SoundPulse
+            </h1>
+            <p class="text-spotify font-semibold text-xs tracking-widest uppercase mb-8 intro-subtext">
+                Spotify Listening Analytics
+            </p>
+
+            <div class="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-white/5 border border-white/10 text-xs text-gray-300 intro-subtext backdrop-blur-md shadow-inner">
+                <span class="text-gray-400 font-medium">Created by</span>
+                <span class="text-spotify font-black tracking-widest uppercase text-xs">Dami</span>
+            </div>
+        </div>
+
+        <button onclick="dismissIntro()" class="absolute bottom-8 text-xs text-gray-400 hover:text-white uppercase tracking-widest px-6 py-2.5 rounded-full border border-white/10 hover:border-spotify/50 bg-white/5 transition flex items-center gap-2 backdrop-blur-md">
+            Skip Intro <i class="fa-solid fa-chevron-right text-[10px]"></i>
+        </button>
+    </div>
+
+    <!-- Twizzy Mode Toast Notification -->
+    <div id="twizzy-toast" class="glass-card border border-spotify/50 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 text-white">
+        <div class="w-10 h-10 rounded-xl bg-spotify text-black font-black flex items-center justify-center text-xl shadow-lg shadow-spotify/40">
+            🔔
+        </div>
+        <div>
+            <h4 class="font-extrabold text-sm text-spotify font-display">TWIZZY MODE ACTIVATED</h4>
+            <p class="text-xs text-gray-300">Double chime tuned & luxury SUV speeding by!</p>
+        </div>
+    </div>
+
+    <!-- Background Atmospheric Glows -->
+    <div class="fixed top-0 -left-40 w-96 h-96 bg-glow-1 rounded-full pointer-events-none animate-pulse-slow z-0"></div>
+    <div class="fixed top-1/3 -right-40 w-96 h-96 bg-glow-2 rounded-full pointer-events-none animate-pulse-slow z-0"></div>
+    <div class="fixed bottom-0 left-1/3 w-[500px] h-[500px] bg-glow-3 rounded-full pointer-events-none animate-pulse-slow z-0"></div>
+
+    <div class="relative z-10 flex-1 flex flex-col">
+        <!-- Header / Navigation -->
+        <header id="main-header" class="border-b border-white/10 glass-card sticky top-0 z-50 px-6 py-4">
+            <div class="max-w-7xl mx-auto flex items-center justify-between">
+                <div class="flex items-center gap-3 cursor-pointer" onclick="resetToUpload()">
+                    <div class="w-10 h-10 rounded-full bg-spotify flex items-center justify-center text-black text-xl font-black shadow-lg shadow-spotify/30 cursor-pointer select-none" onclick="handleLogoClick()">
+                        <i class="fa-brands fa-spotify"></i>
+                    </div>
+                    <div>
+                        <span class="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-spotify">SoundPulse</span>
+                        <span class="text-xs text-gray-400 block -mt-1 font-medium">Spotify Listening Analytics</span>
+                    </div>
+                </div>
+
+                <!-- Navigation Controls (Visible after Data Load) -->
+                <div id="nav-controls" class="hidden flex items-center gap-2 sm:gap-4">
+                    <div class="bg-black/40 p-1 rounded-xl border border-white/10 flex text-sm">
+                        <button id="btn-tab-overview" onclick="switchTab('overview')" class="px-4 py-2 rounded-lg font-medium transition-all duration-200 bg-spotify text-black shadow-md">
+                            <i class="fa-solid fa-fire mr-2"></i>Overview
+                        </button>
+                        <button id="btn-tab-details" onclick="switchTab('details')" class="px-4 py-2 rounded-lg font-medium transition-all duration-200 text-gray-400 hover:text-white">
+                            <i class="fa-solid fa-chart-pie mr-2"></i>Detailed
+                        </button>
+                    </div>
+
+                    <button onclick="resetToUpload()" class="p-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all text-sm" title="Upload New File">
+                        <i class="fa-solid fa-arrow-up-from-bracket"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="max-w-7xl mx-auto w-full px-4 sm:px-6 py-8 flex-1">
+
+            <!-- ================= UPLOAD VIEW ================= -->
+            <section id="upload-view" class="max-w-3xl mx-auto py-12 slide-enter">
+                <div class="text-center mb-10">
+                    <span class="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-spotify bg-spotify/10 border border-spotify/20 rounded-full inline-block mb-4">
+                        100% Local & Privacy-First
+                    </span>
+                    <h1 class="text-4xl sm:text-6xl font-black tracking-tight mb-4 text-white font-display">
+                        Discover Your <span class="bg-clip-text text-transparent bg-gradient-to-r from-spotify via-emerald-400 to-cyan-400">Music DNA</span>
+                    </h1>
+                    <p class="text-gray-400 text-lg max-w-xl mx-auto">
+                        Upload your official Spotify `.json` files or instantly experience the interactive dashboard with demo data!
+                    </p>
+                </div>
+
+                <!-- Drag & Drop Zone -->
+            <div id="drop-zone" class="glass-card rounded-3xl p-10 text-center border-2 border-dashed border-white/15 hover:border-spotify/50 transition-all duration-300 group cursor-pointer relative overflow-hidden mb-6">
+                <input type="file" id="file-input" multiple accept=".json" class="hidden">
+                
+                <div class="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-tr from-spotify/20 to-emerald-500/10 border border-spotify/30 flex items-center justify-center text-spotify text-3xl group-hover:scale-110 transition-transform duration-300 pointer-events-none">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                </div>
+
+                <h3 class="text-xl font-bold mb-2 text-white pointer-events-none">Drop your Spotify Extended History JSONs here</h3>
+                <p class="text-sm text-gray-400 mb-6 pointer-events-none">Supports <code class="text-spotify bg-spotify/10 px-2 py-0.5 rounded border border-spotify/20">endsong_*.json</code> and <code class="text-spotify bg-spotify/10 px-2 py-0.5 rounded border border-spotify/20">StreamingHistory*.json</code></p>
+
+                <button type="button" id="browse-btn" class="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold transition border border-white/10 text-sm pointer-events-auto">
+                    Browse Files
+                </button>
+            </div>
+
+            <!-- Instant Demo Button -->
+                <div class="flex items-center justify-center gap-4">
+                    <span class="h-px bg-white/10 flex-1"></span>
+                    <span class="text-xs uppercase text-gray-500 tracking-widest font-semibold">OR TRY IT INSTANTLY</span>
+                    <span class="h-px bg-white/10 flex-1"></span>
+                </div>
+
+                <div class="mt-6 text-center">
+                    <button onclick="loadDemoData()" class="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-spotify via-emerald-500 to-cyan-500 text-black font-extrabold hover:opacity-95 transition-all shadow-xl shadow-spotify/20 flex items-center justify-center gap-3 mx-auto text-base transform hover:-translate-y-0.5">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Load Demo Analytics Data
+                    </button>
+                    <p class="text-xs text-gray-500 mt-3">Don't have your Spotify files ready? Click above for a full live preview!</p>
+                </div>
+
+                <!-- Quick Tutorial Accordion -->
+                <div class="mt-12 glass-card rounded-2xl p-6 border border-white/5">
+                    <h4 class="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-circle-info text-spotify"></i> How do I get my Spotify JSON files?
+                    </h4>
+                    <ol class="text-xs text-gray-400 space-y-2 list-decimal list-inside leading-relaxed">
+                        <li>Visit <a href="https://www.spotify.com/account/privacy/" target="_blank" class="text-spotify underline hover:text-emerald-300">spotify.com/account/privacy</a>.</li>
+                        <li>Scroll down to <strong>"Download your data"</strong>.</li>
+                        <li>Request the <strong>"Extended streaming history"</strong> (Spotify will send it via email).</li>
+                        <li>Unzip the downloaded folder and drag the `.json` files directly into this dashboard!</li>
+                    </ol>
+                </div>
+            </section>
+
+
+            <!-- ================= VIEW 1: HERO SUMMARY & TOP ARTISTS ================= -->
+            <section id="overview-view" class="hidden slide-enter space-y-8">
+                
+                <!-- Filter Bar & Year Selector -->
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 glass-card p-4 rounded-2xl">
+                    <div>
+                        <h2 class="text-2xl font-black text-white tracking-tight flex items-center gap-2 font-display">
+                            <span>Yearly Recap & Highlights</span>
+                            <span id="data-year-badge" class="text-xs bg-spotify/20 border border-spotify/30 text-spotify px-2.5 py-0.5 rounded-full font-bold">2026</span>
+                        </h2>
+                        <p class="text-xs text-gray-400">Your personal listening totals and top favorites</p>
+                    </div>
+
+                    <div class="flex items-center gap-3 w-full sm:w-auto">
+                        <!-- Year Selector -->
+                        <div class="flex items-center gap-2 bg-black/50 border border-white/10 rounded-xl px-3 py-1.5 w-full sm:w-auto">
+                            <i class="fa-solid fa-calendar text-gray-400 text-xs"></i>
+                            <select id="year-filter" onchange="applyFilters()" class="bg-transparent text-xs text-white focus:outline-none cursor-pointer w-full">
+                                <option value="all">All Time</option>
+                            </select>
+                        </div>
+
+                        <!-- Celebration Confetti Button -->
+                        <button onclick="triggerConfetti()" class="px-4 py-2 rounded-xl bg-spotify/10 border border-spotify/30 text-spotify hover:bg-spotify/20 transition text-xs font-bold flex items-center gap-2 whitespace-nowrap">
+                            <i class="fa-solid fa-sparkles"></i> Celebrate!
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Key Metric Cards -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="glass-card glass-card-interactive p-5 rounded-2xl relative overflow-hidden group">
+                        <div class="text-xs text-gray-400 font-semibold mb-1 uppercase tracking-wider">Total Playtime</div>
+                        <div id="stat-hours" class="text-3xl sm:text-4xl font-black text-white mb-1">0</div>
+                        <div class="text-xs text-spotify font-medium flex items-center gap-1">
+                            <i class="fa-solid fa-clock"></i> <span id="stat-days">0</span> Days Non-Stop
+                        </div>
+                        <div class="absolute -right-2 -bottom-2 text-6xl opacity-5 text-spotify group-hover:opacity-10 transition">
+                            <i class="fa-solid fa-headphones"></i>
+                        </div>
+                    </div>
+
+                    <div class="glass-card glass-card-interactive p-5 rounded-2xl relative overflow-hidden group">
+                        <div class="text-xs text-gray-400 font-semibold mb-1 uppercase tracking-wider">Total Streams</div>
+                        <div id="stat-streams" class="text-3xl sm:text-4xl font-black text-white mb-1">0</div>
+                        <div class="text-xs text-neon-cyan font-medium flex items-center gap-1">
+                            <i class="fa-solid fa-play"></i> Played Tracks
+                        </div>
+                        <div class="absolute -right-2 -bottom-2 text-6xl opacity-5 text-neon-cyan group-hover:opacity-10 transition">
+                            <i class="fa-solid fa-music"></i>
+                        </div>
+                    </div>
+
+                    <div class="glass-card glass-card-interactive p-5 rounded-2xl relative overflow-hidden group">
+                        <div class="text-xs text-gray-400 font-semibold mb-1 uppercase tracking-wider">Unique Artists</div>
+                        <div id="stat-artists" class="text-3xl sm:text-4xl font-black text-white mb-1">0</div>
+                        <div class="text-xs text-neon-purple font-medium flex items-center gap-1">
+                            <i class="fa-solid fa-user-group"></i> Distinct Artists
+                        </div>
+                        <div class="absolute -right-2 -bottom-2 text-6xl opacity-5 text-neon-purple group-hover:opacity-10 transition">
+                            <i class="fa-solid fa-microphone-lines"></i>
+                        </div>
+                    </div>
+
+                    <div class="glass-card glass-card-interactive p-5 rounded-2xl relative overflow-hidden group">
+                        <div class="text-xs text-gray-400 font-semibold mb-1 uppercase tracking-wider">Peak Listening Day</div>
+                        <div id="stat-top-day" class="text-2xl sm:text-3xl font-black text-white mb-1 truncate">-</div>
+                        <div class="text-xs text-neon-pink font-medium flex items-center gap-1">
+                            <i class="fa-solid fa-bolt"></i> Most Active Day
+                        </div>
+                        <div class="absolute -right-2 -bottom-2 text-6xl opacity-5 text-neon-pink group-hover:opacity-10 transition">
+                            <i class="fa-solid fa-calendar-day"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top 1 Highlight Showcase Banner -->
+                <div id="top-artist-banner" class="glass-card rounded-3xl p-6 sm:p-8 relative overflow-hidden border border-spotify/30 bg-gradient-to-r from-spotify/20 via-spotify/5 to-transparent">
+                    <div class="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+                        <div class="flex items-center gap-6 text-center md:text-left flex-col md:flex-row">
+                            <div class="w-24 h-24 rounded-2xl bg-gradient-to-tr from-spotify to-cyan-400 flex items-center justify-center text-black text-4xl font-black shadow-2xl shadow-spotify/40 relative">
+                                <span class="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-yellow-400 text-black text-xs font-black flex items-center justify-center shadow-lg">#1</span>
+                                <i class="fa-solid fa-crown"></i>
+                            </div>
+                            <div>
+                                <span class="text-xs uppercase font-bold text-spotify tracking-widest">Your #1 Artist</span>
+                                <h3 id="top-artist-name" class="text-3xl sm:text-5xl font-black text-white tracking-tight mt-1 font-display">Artist Name</h3>
+                                <p id="top-artist-stats" class="text-gray-300 text-sm mt-2 font-medium">0 Hours Played • 0 Streams</p>
+                            </div>
+                        </div>
+
+                        <div class="text-right">
+                            <button onclick="switchTab('details')" class="px-6 py-3 rounded-xl bg-spotify text-black font-extrabold hover:scale-105 transition shadow-lg shadow-spotify/30 text-sm flex items-center gap-2">
+                                Deep Dive Analytics <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top Artists Leaderboard Cards Grid -->
+                <div>
+                    <h3 class="text-xl font-extrabold text-white mb-4 flex items-center gap-2 font-display">
+                        <i class="fa-solid fa-ranking-star text-spotify"></i> Top 10 Favorite Artists
+                    </h3>
+
+                    <div id="top-artists-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Top Tracks List -->
+                <div class="glass-card rounded-3xl p-6">
+                    <h3 class="text-xl font-extrabold text-white mb-6 flex items-center gap-2 font-display">
+                        <i class="fa-solid fa-compact-disc text-neon-cyan"></i> Most Played Songs
+                    </h3>
+                    <div id="top-tracks-list" class="space-y-3">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Banner Action to Detailed View -->
+                <div class="text-center py-6">
+                    <button onclick="switchTab('details')" class="px-8 py-4 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-white font-bold transition flex items-center gap-3 mx-auto text-sm group">
+                        <span>View Detailed Charts, Genres & Hour Breakdown</span>
+                        <i class="fa-solid fa-chevron-right group-hover:translate-x-1 transition-transform text-spotify"></i>
+                    </button>
+                </div>
+
+            </section>
+
+
+            <!-- ================= VIEW 2: DETAILED ANALYTICS ================= -->
+            <section id="details-view" class="hidden slide-enter space-y-8">
+
+                <!-- Header Search & Timeframe Filter Bar -->
+                <div class="glass-card p-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div class="flex items-center gap-3 w-full md:w-auto">
+                        <div class="w-10 h-10 rounded-xl bg-neon-purple/20 border border-neon-purple/30 text-neon-purple flex items-center justify-center font-bold">
+                            <i class="fa-solid fa-chart-line"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-white">Detailed Analytics</h2>
+                            <p class="text-xs text-gray-400">Drilldown by month, week, genres, and artist songs</p>
+                        </div>
+                    </div>
+
+                    <!-- Timeframe & Search Filters -->
+                    <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                        <!-- Month Filter -->
+                        <div class="flex items-center gap-2 bg-black/50 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white">
+                            <i class="fa-solid fa-calendar-days text-spotify"></i>
+                            <select id="month-filter" onchange="applyFilters()" class="bg-transparent focus:outline-none cursor-pointer">
+                                <option value="all">All Months</option>
+                                <option value="0">January</option>
+                                <option value="1">February</option>
+                                <option value="2">March</option>
+                                <option value="3">April</option>
+                                <option value="4">May</option>
+                                <option value="5">June</option>
+                                <option value="6">July</option>
+                                <option value="7">August</option>
+                                <option value="8">September</option>
+                                <option value="9">October</option>
+                                <option value="10">November</option>
+                                <option value="11">December</option>
+                            </select>
+                        </div>
+
+                        <!-- Search Input -->
+                        <div class="relative w-full md:w-56">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-xs text-gray-400"></i>
+                            <input type="text" id="search-input" onkeyup="filterTracksTable()" placeholder="Search artist or track..." class="w-full bg-black/40 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-spotify transition">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Grid: Row 1 -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Genre Distribution Pie Chart -->
+                    <div class="glass-card p-6 rounded-3xl flex flex-col justify-between">
+                        <div class="mb-4">
+                            <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-pie-chart text-neon-pink"></i> Expanded Genre Breakdown
+                            </h3>
+                            <p class="text-xs text-gray-400">Smart genre recognition engine</p>
+                        </div>
+                        <div class="relative h-64 flex items-center justify-center">
+                            <canvas id="genreChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Top Artists Share Doughnut -->
+                    <div class="glass-card p-6 rounded-3xl flex flex-col justify-between">
+                        <div class="mb-4">
+                            <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-user-astronaut text-neon-purple"></i> Top Artists Share
+                            </h3>
+                            <p class="text-xs text-gray-400">Distribution among your top listened artists</p>
+                        </div>
+                        <div class="relative h-64 flex items-center justify-center">
+                            <canvas id="artistsPieChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Top Songs Share Doughnut -->
+                    <div class="glass-card p-6 rounded-3xl flex flex-col justify-between">
+                        <div class="mb-4">
+                            <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-music text-neon-cyan"></i> Top Tracks Share
+                            </h3>
+                            <p class="text-xs text-gray-400">Distribution of top streamed songs</p>
+                        </div>
+                        <div class="relative h-64 flex items-center justify-center">
+                            <canvas id="songsPieChart"></canvas>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Charts Grid: Row 2 -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Monthly / Timeline Chart -->
+                    <div class="glass-card p-6 rounded-3xl lg:col-span-2 flex flex-col justify-between">
+                        <div class="mb-4">
+                            <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-chart-column text-neon-cyan"></i> Monthly Stream Distribution (Hours)
+                            </h3>
+                            <p class="text-xs text-gray-400">Stream hours across months</p>
+                        </div>
+                        <div class="relative h-64">
+                            <canvas id="monthlyChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Peak Hours Line Chart -->
+                    <div class="glass-card p-6 rounded-3xl flex flex-col justify-between">
+                        <div class="mb-4">
+                            <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-clock text-spotify"></i> Daily Peak Hours
+                            </h3>
+                            <p class="text-xs text-gray-400">Listening volume by hour of day</p>
+                        </div>
+                        <div class="relative h-64">
+                            <canvas id="hourlyChart"></canvas>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Full Interactive Song Table (With Clickable Artist Drilldown) -->
+                <div class="glass-card rounded-3xl p-6 overflow-hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="text-lg font-extrabold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-list-ol text-spotify"></i> History Leaderboard
+                            </h3>
+                            <p class="text-xs text-gray-400">Click any artist row to open their full song breakdown!</p>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead>
+                                <tr class="text-gray-400 border-b border-white/10 uppercase tracking-wider">
+                                    <th class="pb-3 px-3">#</th>
+                                    <th class="pb-3 px-3">Track</th>
+                                    <th class="pb-3 px-3">Artist (Click for details)</th>
+                                    <th class="pb-3 px-3 text-right">Streams</th>
+                                    <th class="pb-3 px-3 text-right">Play Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detailed-tracks-tbody" class="divide-y divide-white/5">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </section>
+
+        </main>
+
+        <!-- ARTIST DRILLDOWN MODAL -->
+        <div id="artist-modal" class="fixed inset-0 z-[120] bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+            <div class="glass-card w-full max-w-2xl rounded-3xl p-6 sm:p-8 relative border border-spotify/30 animate-fade-in max-h-[90vh] overflow-y-auto">
+                <button onclick="closeArtistModal()" class="absolute top-5 right-5 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+
+                <div class="flex items-center gap-4 mb-6">
+                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-spotify to-neon-purple flex items-center justify-center text-black text-2xl font-black">
+                        <i class="fa-solid fa-microphone-lines"></i>
+                    </div>
+                    <div>
+                        <span class="text-xs uppercase tracking-widest text-spotify font-bold">Artist Spotlight</span>
+                        <h3 id="modal-artist-name" class="text-2xl sm:text-3xl font-black text-white">Artist Name</h3>
+                        <p id="modal-artist-stats" class="text-xs text-gray-400">0 Total Hours • 0 Streams</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <h4 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-compact-disc text-neon-cyan"></i> Top Songs by this Artist
+                        </h4>
+                        <div id="modal-artist-songs-list" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col items-center justify-center">
+                        <h4 class="text-sm font-bold text-white mb-3 text-center">Songs Distribution</h4>
+                        <div class="relative w-48 h-48">
+                            <canvas id="modalArtistPieChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="border-t border-white/10 glass-card py-6 px-6 text-center text-xs text-gray-500 mt-12">
+            <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div>
+                    <span class="font-bold text-gray-300">Creation by ryoudami</span> • <span class="text-gray-400">SoundPulse Analytics</span> — Not affiliated with Spotify AB.
+                </div>
+                <div class="flex items-center gap-4">
+                    <button onclick="triggerTwizzyMode()" class="hover:text-spotify transition flex items-center gap-1.5 font-bold text-gray-400 hover:text-white bg-white/5 hover:bg-spotify/10 px-3 py-1.5 rounded-xl border border-white/10 hover:border-spotify/30">
+                        <i class="fa-solid fa-bell text-spotify"></i> twizzy mode
+                    </button>
+                    <span>•</span>
+                    <span class="hover:text-spotify cursor-pointer" onclick="loadDemoData()"><i class="fa-solid fa-rotate-right mr-1"></i> Reload Demo</span>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- MAIN JAVASCRIPT LOGIC -->
+    <script>
+        // Global State Store
+        let rawStreamingData = [];
+        let filteredData = [];
+        let activeTab = 'overview';
+        let chartInstances = {};
+        let introFinished = false;
+        let logoClickCount = 0;
+        let audioCtx = null;
+
+        // Auto transition intro overlay after 2.8s
+        setTimeout(() => { dismissIntro(); }, 2800);
+
+        // Map artists to genres dynamically
+        const GENRE_MAP = {
+            'Yeat': 'Rage / Rap',
+            'Playboi Carti': 'Rage / Rap',
+            'Ken Carson': 'Rage / Rap',
+            'Destroy Lonely': 'Rage / Rap',
+            'Travis Scott': 'Hip-Hop / Rap',
+            'Drake': 'Hip-Hop / Rap',
+            'Taylor Swift': 'Pop',
+            'The Weeknd': 'R&B / Pop',
+            'Apache 207': 'German Rap',
+            'Ayliva': 'Pop / R&B',
+            'Billie Eilish': 'Pop / Alternative',
+            'CRO': 'German Pop / Rap'
+        };
+
+        const GENRE_COLORS = ['#1DB954', '#a855f7', '#06b6d4', '#ec4899', '#eab308', '#3b82f6', '#f97316', '#14b8a6'];
+
+        window.addEventListener('DOMContentLoaded', () => {
+            setupDragAndDrop();
+        });
+
+        function dismissIntro() {
+            if (introFinished) return;
+            introFinished = true;
+            const intro = document.getElementById('intro-overlay');
+            if (intro) {
+                intro.classList.add('dismissing');
+                setTimeout(() => intro.remove(), 900);
+            }
+        }
+
+        // Synthesize iconic deeper double-strike Yeat Bell sound ("ding ding")
+        function playYeatBellSound() {
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
+                const now = audioCtx.currentTime;
+
+                // Helper function to play a single low-pitched metallic bell strike
+                const triggerStrike = (startTime, pitchFreq = 260) => {
+                    // Main Low-Pitch Sine Bell Tone
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(pitchFreq, startTime);
+                    osc.frequency.exponentialRampToValueAtTime(pitchFreq * 0.75, startTime + 1.2);
+
+                    // Soft volume gain (softer, lower volume)
+                    gain.gain.setValueAtTime(0.18, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + 1.4);
+
+                    // Metallic Harmonic Overlay
+                    const oscHarmonic = audioCtx.createOscillator();
+                    const gainHarmonic = audioCtx.createGain();
+
+                    oscHarmonic.type = 'triangle';
+                    oscHarmonic.frequency.setValueAtTime(pitchFreq * 2.5, startTime);
+                    gainHarmonic.gain.setValueAtTime(0.06, startTime);
+                    gainHarmonic.gain.exponentialRampToValueAtTime(0.001, startTime + 0.7);
+
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+
+                    oscHarmonic.connect(gainHarmonic);
+                    gainHarmonic.connect(audioCtx.destination);
+
+                    osc.start(startTime);
+                    oscHarmonic.start(startTime);
+
+                    osc.stop(startTime + 1.5);
+                    oscHarmonic.stop(startTime + 0.8);
+                };
+
+                // Strike 1 ("Ding")
+                triggerStrike(now, 260);
+                // Strike 2 ("Ding") - 180ms later, slightly lower pitch
+                triggerStrike(now + 0.18, 240);
+
+            } catch (e) {
+                console.warn('AudioContext sound effect failed:', e);
+            }
+        }
+
+        // Secret Twizzy Mode Trigger with Vehicle Animation
+        function triggerTwizzyMode() {
+            playYeatBellSound();
+            document.body.classList.toggle('rage-mode');
+
+            // Show Toast Popup
+            const toast = document.getElementById('twizzy-toast');
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3500);
+
+            // Spawn Sleek Passing Luxury Vehicle
+            spawnTonkaTruck();
+
+            triggerConfetti();
+        }
+
+        function spawnTonkaTruck() {
+            const oldTonka = document.querySelector('.tonka-truck-anim');
+            if (oldTonka) oldTonka.remove();
+
+            const tonka = document.createElement('div');
+            tonka.className = 'tonka-truck-anim';
+            tonka.innerHTML = `
+                <div class="relative flex items-center gap-3 bg-black/85 border border-spotify/60 px-6 py-3.5 rounded-2xl shadow-[0_0_35px_rgba(29,185,84,0.3)] backdrop-blur-xl text-white">
+                    <div class="text-2xl text-spotify font-black">🏎️</div>
+                    <div>
+                        <div class="text-xs font-black text-spotify uppercase tracking-widest font-display">G-WAGON / TONKA</div>
+                        <div class="text-[10px] text-gray-400 font-medium">Luh Geeked Speeding...</div>
+                    </div>
+                    <!-- Neon Green Tail Light Trail -->
+                    <div class="w-12 h-1 bg-gradient-to-r from-spotify to-transparent rounded-full ml-1 animate-pulse"></div>
+                </div>
+            `;
+            document.body.appendChild(tonka);
+
+            setTimeout(() => {
+                if (tonka) tonka.remove();
+            }, 2600);
+        }
+
+        // Secret Easter Egg Logo Clicks
+        function handleLogoClick() {
+            logoClickCount++;
+            if (logoClickCount >= 5) {
+                triggerTwizzyMode();
+                logoClickCount = 0;
+            }
+        }
+
+        // Keyboard Easter Egg listener
+        let secretBuffer = '';
+        window.addEventListener('keydown', (e) => {
+            secretBuffer += e.key.toLowerCase();
+            if (secretBuffer.length > 10) secretBuffer = secretBuffer.slice(-10);
+
+            if (secretBuffer.includes('twizzy') || secretBuffer.includes('yeat') || secretBuffer.includes('tonka')) {
+                triggerTwizzyMode();
+                secretBuffer = '';
+            }
+        });
+
+        // Setup Drag & Drop File Handlers
+        function setupDragAndDrop() {
+            const dropZone = document.getElementById('drop-zone');
+            const fileInput = document.getElementById('file-input');
+            const browseBtn = document.getElementById('browse-btn');
+
+            if (!dropZone || !fileInput) return;
+
+            // Click zone or browse button opens file browser
+            dropZone.addEventListener('click', (e) => {
+                fileInput.click();
+            });
+
+            if (browseBtn) {
+                browseBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    fileInput.click();
+                });
+            }
+
+            // Drag and drop event listeners
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.classList.add('border-spotify', 'bg-spotify/10');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.classList.remove('border-spotify', 'bg-spotify/10');
+                }, false);
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                const files = e.dataTransfer.files;
+                if (files && files.length > 0) {
+                    handleFiles(files);
+                }
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                    handleFiles(e.target.files);
+                }
+            });
+        }
+
+        // Process Uploaded JSON Files
+        function handleFiles(files) {
+            if (!files.length) return;
+            
+            let loadedFiles = 0;
+            let combinedData = [];
+
+            Array.from(files).forEach(file => {
+                if (!file.name.endsWith('.json')) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const parsed = JSON.parse(event.target.result);
+                        if (Array.isArray(parsed)) {
+                            combinedData = combinedData.concat(parsed);
+                        }
+                    } catch (err) {
+                        console.error('Error parsing JSON file:', err);
+                    }
+
+                    loadedFiles++;
+                    if (loadedFiles === files.length) {
+                        if (combinedData.length === 0) {
+                            alert('No valid Spotify streaming history found.');
+                            return;
+                        }
+                        processStreamingData(combinedData);
+                    }
+                };
+                reader.readAsText(file);
+            });
+        }
+
+        // Generate Realistic Demo Data for Instant Preview
+        function loadDemoData() {
+            const demoTracks = [
+                { artist: 'Yeat', track: 'IDGAF (feat. Drake)', ms: 214000 },
+                { artist: 'Yeat', track: 'Monëy so big', ms: 160000 },
+                { artist: 'Playboi Carti', track: 'FE!N', ms: 191000 },
+                { artist: 'Ken Carson', track: 'A Yale', ms: 145000 },
+                { artist: 'Travis Scott', track: 'MY EYES', ms: 251000 },
+                { artist: 'Taylor Swift', track: 'Cruel Summer', ms: 178000 },
+                { artist: 'The Weeknd', track: 'Blinding Lights', ms: 200000 },
+                { artist: 'Apache 207', track: 'Roller', ms: 159000 },
+                { artist: 'Ayliva', track: 'Wunder', ms: 184000 },
+                { artist: 'Drake', track: 'God\'s Plan', ms: 198000 },
+                { artist: 'Billie Eilish', track: 'BIRDS OF A FEATHER', ms: 210000 },
+                { artist: 'CRO', track: 'Traum', ms: 195000 }
+            ];
+
+            const platforms = ['iOS', 'Android', 'Windows Desktop', 'Web Player'];
+            const demoData = [];
+            const year = 2026;
+
+            for (let i = 0; i < 1800; i++) {
+                const randomMonth = Math.floor(Math.random() * 12);
+                const randomDay = Math.floor(Math.random() * 28) + 1;
+                const randomHour = Math.floor(Math.random() * 24);
+
+                const dateStr = `${year}-${String(randomMonth + 1).padStart(2, '0')}-${String(randomDay).padStart(2, '0')}T${String(randomHour).padStart(2, '0')}:${String(Math.floor(Math.random()*60)).padStart(2, '0')}:00Z`;
+                const trackObj = demoTracks[Math.floor(Math.random() * demoTracks.length)];
+                const platform = platforms[Math.floor(Math.random() * platforms.length)];
+
+                demoData.push({
+                    ts: dateStr,
+                    endTime: dateStr,
+                    msPlayed: trackObj.ms,
+                    ms_played: trackObj.ms,
+                    master_metadata_track_name: trackObj.track,
+                    trackName: trackObj.track,
+                    master_metadata_album_artist_name: trackObj.artist,
+                    artistName: trackObj.artist,
+                    platform: platform
+                });
+            }
+
+            processStreamingData(demoData);
+            triggerConfetti();
+        }
+
+        // Process raw array into normalized records
+        function processStreamingData(data) {
+            rawStreamingData = data.map(item => {
+                const ms = item.ms_played || item.msPlayed || 0;
+                const artist = item.master_metadata_album_artist_name || item.artistName || 'Unknown Artist';
+                const track = item.master_metadata_track_name || item.trackName || 'Unknown Track';
+                const timeStr = item.ts || item.endTime || new Date().toISOString();
+                const date = new Date(timeStr);
+                const platform = item.platform || 'Unknown';
+
+                return {
+                    artist,
+                    track,
+                    ms,
+                    date,
+                    year: date.getFullYear(),
+                    month: date.getMonth(),
+                    hour: date.getHours(),
+                    dayOfWeek: date.getDay(),
+                    platform
+                };
+            }).filter(item => item.ms > 10000);
+
+            populateYearFilter();
+            applyFilters();
+
+            // Switch UI View
+            document.getElementById('upload-view').classList.add('hidden');
+            document.getElementById('nav-controls').classList.remove('hidden');
+            document.getElementById('overview-view').classList.remove('hidden');
+        }
+
+        // Populate Years Dropdown
+        function populateYearFilter() {
+            const years = [...new Set(rawStreamingData.map(d => d.year))].sort((a,b) => b - a);
+            const select = document.getElementById('year-filter');
+            select.innerHTML = '<option value="all">All Years</option>';
+
+            years.forEach(y => {
+                if(!isNaN(y)) {
+                    select.innerHTML += `<option value="${y}">${y}</option>`;
+                }
+            });
+
+            if (years.length > 0) {
+                select.value = years[0];
+            }
+        }
+
+        // Filter Data by Selected Year & Month
+        function applyFilters() {
+            const selectedYear = document.getElementById('year-filter').value;
+            const selectedMonth = document.getElementById('month-filter').value;
+
+            document.getElementById('data-year-badge').innerText = selectedYear === 'all' ? 'All Years' : selectedYear;
+
+            filteredData = rawStreamingData.filter(d => {
+                const matchYear = (selectedYear === 'all' || d.year == selectedYear);
+                const matchMonth = (selectedMonth === 'all' || d.month == selectedMonth);
+                return matchYear && matchMonth;
+            });
+
+            renderOverview();
+            renderDetails();
+        }
+
+        // Render Hero Overview (View 1)
+        function renderOverview() {
+            const totalMs = filteredData.reduce((acc, curr) => acc + curr.ms, 0);
+            const totalHours = (totalMs / (1000 * 60 * 60)).toFixed(1);
+            const totalDays = (totalMs / (1000 * 60 * 60 * 24)).toFixed(1);
+
+            // Metrics Update
+            document.getElementById('stat-hours').innerText = Number(totalHours).toLocaleString('en-US');
+            document.getElementById('stat-days').innerText = totalDays;
+            document.getElementById('stat-streams').innerText = filteredData.length.toLocaleString('en-US');
+
+            const artistCounts = {};
+            const artistMs = {};
+            const trackCounts = {};
+            const dayFrequency = [0,0,0,0,0,0,0];
+            const daysMap = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+            filteredData.forEach(d => {
+                artistCounts[d.artist] = (artistCounts[d.artist] || 0) + 1;
+                artistMs[d.artist] = (artistMs[d.artist] || 0) + d.ms;
+                
+                const trackKey = `${d.track} ___ ${d.artist}`;
+                trackCounts[trackKey] = (trackCounts[trackKey] || 0) + 1;
+
+                if (!isNaN(d.dayOfWeek)) dayFrequency[d.dayOfWeek]++;
+            });
+
+            document.getElementById('stat-artists').innerText = Object.keys(artistCounts).length.toLocaleString('en-US');
+
+            const topDayIndex = dayFrequency.indexOf(Math.max(...dayFrequency));
+            document.getElementById('stat-top-day').innerText = daysMap[topDayIndex] || 'Friday';
+
+            const sortedArtists = Object.keys(artistMs).sort((a,b) => artistMs[b] - artistMs[a]);
+            
+            if (sortedArtists.length > 0) {
+                const top1 = sortedArtists[0];
+                const top1Hours = (artistMs[top1] / (1000 * 60 * 60)).toFixed(1);
+                document.getElementById('top-artist-name').innerText = top1;
+                document.getElementById('top-artist-stats').innerText = `${top1Hours} Hours listened • ${artistCounts[top1]} Streams`;
+            }
+
+            // Render Top 10 Grid Cards (Clickable for drilldown)
+            const grid = document.getElementById('top-artists-grid');
+            grid.innerHTML = '';
+
+            sortedArtists.slice(0, 10).forEach((artist, index) => {
+                const hrs = (artistMs[artist] / (1000 * 60 * 60)).toFixed(1);
+                const rankClass = index === 0 ? 'rank-1' : (index === 1 ? 'rank-2' : (index === 2 ? 'rank-3' : 'rank-default'));
+
+                grid.innerHTML += `
+                    <div onclick="openArtistModal('${artist.replace(/'/g, "\\'")}')" class="glass-card glass-card-interactive p-4 rounded-2xl flex flex-col justify-between stagger-item cursor-pointer group" style="animation-delay: ${index * 0.05}s">
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shadow ${rankClass}">#${index + 1}</span>
+                                <span class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">${artistCounts[artist]} Streams</span>
+                            </div>
+                            <h4 class="font-bold text-white text-sm truncate mb-1 group-hover:text-spotify transition" title="${artist}">${artist}</h4>
+                        </div>
+                        <div class="mt-3 pt-3 border-t border-white/5 flex items-center justify-between text-xs text-gray-400">
+                            <span>Total Time:</span>
+                            <span class="font-bold text-spotify">${hrs} hrs</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // Top Songs
+            const sortedTracks = Object.keys(trackCounts).sort((a,b) => trackCounts[b] - trackCounts[a]);
+            const tracksList = document.getElementById('top-tracks-list');
+            tracksList.innerHTML = '';
+
+            sortedTracks.slice(0, 5).forEach((item, index) => {
+                const [track, artist] = item.split(' ___ ');
+                const count = trackCounts[item];
+
+                tracksList.innerHTML += `
+                    <div onclick="openArtistModal('${artist.replace(/'/g, "\\'")}')" class="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition cursor-pointer">
+                        <div class="flex items-center gap-3 overflow-hidden">
+                            <span class="font-black text-sm text-gray-500 w-5 text-center">${index + 1}</span>
+                            <div class="truncate">
+                                <p class="font-bold text-sm text-white truncate">${track}</p>
+                                <p class="text-xs text-gray-400 truncate">${artist}</p>
+                            </div>
+                        </div>
+                        <span class="text-xs font-bold text-spotify px-3 py-1 rounded-full bg-spotify/10 border border-spotify/20 whitespace-nowrap">
+                            ${count} Streams
+                        </span>
+                    </div>
+                `;
+            });
+        }
+
+        // Render Detailed Analytics (View 2)
+        function renderDetails() {
+            renderGenreChart();
+            renderArtistsPieChart();
+            renderSongsPieChart();
+            renderHourlyChart();
+            renderMonthlyChart();
+            renderDetailedTracksTable();
+        }
+
+        // 1. Fixed Genre Chart with Dynamic Categorization
+        function renderGenreChart() {
+            const genreCounts = {};
+            filteredData.forEach(d => {
+                const genre = GENRE_MAP[d.artist] || 'Rap / Hip-Hop';
+                genreCounts[genre] = (genreCounts[genre] || 0) + 1;
+            });
+
+            const labels = Object.keys(genreCounts);
+            const data = Object.values(genreCounts);
+
+            destroyChart('genreChart');
+            const ctx = document.getElementById('genreChart').getContext('2d');
+            chartInstances['genreChart'] = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: GENRE_COLORS,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#9ca3af', font: { family: 'Inter', size: 10 } } }
+                    },
+                    cutout: '65%'
+                }
+            });
+        }
+
+        // 2. Top Artists Pie Chart
+        function renderArtistsPieChart() {
+            const artistCounts = {};
+            filteredData.forEach(d => {
+                artistCounts[d.artist] = (artistCounts[d.artist] || 0) + 1;
+            });
+
+            const sorted = Object.keys(artistCounts).sort((a,b) => artistCounts[b] - artistCounts[a]).slice(0, 6);
+            const data = sorted.map(a => artistCounts[a]);
+
+            destroyChart('artistsPieChart');
+            const ctx = document.getElementById('artistsPieChart').getContext('2d');
+            chartInstances['artistsPieChart'] = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: sorted,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: ['#a855f7', '#06b6d4', '#1DB954', '#ec4899', '#eab308', '#6366f1'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { color: '#9ca3af', font: { size: 10 } } } },
+                    cutout: '65%'
+                }
+            });
+        }
+
+        // 3. Top Songs Pie Chart
+        function renderSongsPieChart() {
+            const trackCounts = {};
+            filteredData.forEach(d => {
+                trackCounts[d.track] = (trackCounts[d.track] || 0) + 1;
+            });
+
+            const sorted = Object.keys(trackCounts).sort((a,b) => trackCounts[b] - trackCounts[a]).slice(0, 6);
+            const data = sorted.map(t => trackCounts[t]);
+
+            destroyChart('songsPieChart');
+            const ctx = document.getElementById('songsPieChart').getContext('2d');
+            chartInstances['songsPieChart'] = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: sorted,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: ['#1DB954', '#06b6d4', '#ec4899', '#a855f7', '#3b82f6', '#f59e0b'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { color: '#9ca3af', font: { size: 10 } } } },
+                    cutout: '65%'
+                }
+            });
+        }
+
+        // 4. Hourly Distribution
+        function renderHourlyChart() {
+            const hoursData = new Array(24).fill(0);
+            filteredData.forEach(d => {
+                if(!isNaN(d.hour)) hoursData[d.hour] += (d.ms / (1000 * 60));
+            });
+
+            const labels = Array.from({length: 24}, (_, i) => `${i}:00`);
+
+            destroyChart('hourlyChart');
+            const ctx = document.getElementById('hourlyChart').getContext('2d');
+            
+            const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, 'rgba(29, 185, 84, 0.4)');
+            gradient.addColorStop(1, 'rgba(29, 185, 84, 0)');
+
+            chartInstances['hourlyChart'] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Minutes Played',
+                        data: hoursData.map(m => Math.round(m)),
+                        borderColor: '#1DB954',
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280' } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280' } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        // 5. Monthly Bar Chart
+        function renderMonthlyChart() {
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const monthlyHours = new Array(12).fill(0);
+
+            filteredData.forEach(d => {
+                if(!isNaN(d.month)) monthlyHours[d.month] += (d.ms / (1000 * 60 * 60));
+            });
+
+            destroyChart('monthlyChart');
+            const ctx = document.getElementById('monthlyChart').getContext('2d');
+
+            chartInstances['monthlyChart'] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: months,
+                    datasets: [{
+                        label: 'Listening Hours',
+                        data: monthlyHours.map(h => h.toFixed(1)),
+                        backgroundColor: '#06b6d4',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#6b7280' } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280' } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        // Render Detailed Songs Table
+        function renderDetailedTracksTable() {
+            const trackMap = {};
+
+            filteredData.forEach(d => {
+                const key = `${d.track} ___ ${d.artist}`;
+                if(!trackMap[key]) {
+                    trackMap[key] = { track: d.track, artist: d.artist, ms: 0, count: 0 };
+                }
+                trackMap[key].ms += d.ms;
+                trackMap[key].count += 1;
+            });
+
+            const sorted = Object.values(trackMap).sort((a,b) => b.count - a.count);
+            const tbody = document.getElementById('detailed-tracks-tbody');
+            tbody.innerHTML = '';
+
+            sorted.slice(0, 50).forEach((item, index) => {
+                const mins = (item.ms / (1000 * 60)).toFixed(0);
+                tbody.innerHTML += `
+                    <tr onclick="openArtistModal('${item.artist.replace(/'/g, "\\'")}')" class="hover:bg-white/5 transition border-b border-white/5 cursor-pointer group">
+                        <td class="py-3 px-3 font-bold text-gray-500">${index + 1}</td>
+                        <td class="py-3 px-3 font-bold text-white">${item.track}</td>
+                        <td class="py-3 px-3 text-spotify font-medium group-hover:underline">${item.artist}</td>
+                        <td class="py-3 px-3 text-right font-semibold text-spotify">${item.count}</td>
+                        <td class="py-3 px-3 text-right text-gray-400">${mins} Mins</td>
+                    </tr>
+                `;
+            });
+        }
+
+        // Open Artist Drilldown Modal
+        function openArtistModal(artistName) {
+            const artistData = filteredData.filter(d => d.artist === artistName);
+            if (!artistData.length) return;
+
+            const totalMs = artistData.reduce((acc, c) => acc + c.ms, 0);
+            const totalHours = (totalMs / (1000 * 60 * 60)).toFixed(1);
+
+            document.getElementById('modal-artist-name').innerText = artistName;
+            document.getElementById('modal-artist-stats').innerText = `${totalHours} Total Hours • ${artistData.length} Streams`;
+
+            // Group Songs by this artist
+            const songMap = {};
+            artistData.forEach(d => {
+                songMap[d.track] = (songMap[d.track] || 0) + 1;
+            });
+
+            const sortedSongs = Object.keys(songMap).sort((a,b) => songMap[b] - songMap[a]);
+            const songsList = document.getElementById('modal-artist-songs-list');
+            songsList.innerHTML = '';
+
+            sortedSongs.forEach((song, i) => {
+                songsList.innerHTML += `
+                    <div class="p-2.5 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between text-xs">
+                        <span class="text-white font-medium truncate">${i+1}. ${song}</span>
+                        <span class="text-spotify font-bold px-2 py-0.5 rounded bg-spotify/10">${songMap[song]} streams</span>
+                    </div>
+                `;
+            });
+
+            // Modal Artist Pie Chart
+            destroyChart('modalArtistPieChart');
+            const ctx = document.getElementById('modalArtistPieChart').getContext('2d');
+            chartInstances['modalArtistPieChart'] = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: sortedSongs.slice(0, 5),
+                    datasets: [{
+                        data: sortedSongs.slice(0, 5).map(s => songMap[s]),
+                        backgroundColor: GENRE_COLORS,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    cutout: '60%'
+                }
+            });
+
+            document.getElementById('artist-modal').classList.remove('hidden');
+        }
+
+        function closeArtistModal() {
+            document.getElementById('artist-modal').classList.add('hidden');
+        }
+
+        // Table Search Filter
+        function filterTracksTable() {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            const rows = document.querySelectorAll('#detailed-tracks-tbody tr');
+
+            rows.forEach(row => {
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(query) ? '' : 'none';
+            });
+        }
+
+        // Helper: Destroy existing Chart.js instances before redraw
+        function destroyChart(chartId) {
+            if (chartInstances[chartId]) {
+                chartInstances[chartId].destroy();
+            }
+        }
+
+        // Tab Switcher with Animations
+        function switchTab(tabName) {
+            activeTab = tabName;
+
+            const overviewView = document.getElementById('overview-view');
+            const detailsView = document.getElementById('details-view');
+            const btnOverview = document.getElementById('btn-tab-overview');
+            const btnDetails = document.getElementById('btn-tab-details');
+
+            if (tabName === 'overview') {
+                overviewView.classList.remove('hidden');
+                detailsView.classList.add('hidden');
+
+                btnOverview.className = 'px-4 py-2 rounded-lg font-medium transition-all duration-200 bg-spotify text-black shadow-md';
+                btnDetails.className = 'px-4 py-2 rounded-lg font-medium transition-all duration-200 text-gray-400 hover:text-white';
+            } else {
+                overviewView.classList.add('hidden');
+                detailsView.classList.remove('hidden');
+
+                btnDetails.className = 'px-4 py-2 rounded-lg font-medium transition-all duration-200 bg-spotify text-black shadow-md';
+                btnOverview.className = 'px-4 py-2 rounded-lg font-medium transition-all duration-200 text-gray-400 hover:text-white';
+
+                renderDetails();
+            }
+        }
+
+        // Reset to Upload View
+        function resetToUpload() {
+            document.getElementById('overview-view').classList.add('hidden');
+            document.getElementById('details-view').classList.add('hidden');
+            document.getElementById('nav-controls').classList.add('hidden');
+            document.getElementById('upload-view').classList.remove('hidden');
+        }
+
+        // Celebration Confetti Effect
+        function triggerConfetti(colors = ['#1DB954', '#a855f7', '#06b6d4', '#ffffff']) {
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 90,
+                    spread: 80,
+                    origin: { y: 0.6 },
+                    colors: colors
+                });
+            }
+        }
+    </script>
+</body>
+</html>
