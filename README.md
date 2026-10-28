@@ -24,7 +24,7 @@
 - 📅 **Detailed Monthly & Weekly Drilldown** – Filter your stats by custom time ranges down to individual weeks.
 - 🎤 **Interactive Artist Deep-Dive** – Click on any rapper or artist to see your top tracks from them.
 - 🗂️ **Local Data Processing** – Drag & drop your official Spotify JSON files safely. Everything stays 100% in your browser.
-
+- 🔊 **Secret Twizzy Mode** – Try unlocking the hidden easter egg! 🔔
 
 ---
 
